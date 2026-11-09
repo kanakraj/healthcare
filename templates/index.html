@@ -1,0 +1,183 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Healthcare Connect</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f3f8fb;
+            color: #263746;
+        }
+
+        header {
+            background: #087e8b;
+            color: white;
+            padding: 22px 8%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h2 {
+            margin: 0;
+        }
+
+        .hero {
+            padding: 75px 8%;
+            background: #dff5f3;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 38px;
+            color: #087e8b;
+        }
+
+        .hero p {
+            font-size: 18px;
+        }
+
+        .services {
+            padding: 40px 8%;
+            text-align: center;
+        }
+
+        .service-container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .service {
+            background: white;
+            padding: 25px;
+            width: 220px;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px #00000012;
+        }
+
+        .appointment {
+            background: white;
+            margin: 30px auto;
+            padding: 30px;
+            max-width: 450px;
+            border-radius: 12px;
+        }
+
+        select, button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 15px;
+            border-radius: 6px;
+        }
+
+        button {
+            background: #087e8b;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        footer {
+            background: #087e8b;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h2>Healthcare Connect</h2>
+    <span>Your Health, Our Priority</span>
+</header>
+
+<section class="hero">
+    <h1>Welcome to Healthcare Connect</h1>
+    <p>Accessible healthcare services for everyone.</p>
+    <p>Book a demo appointment with our healthcare portal.</p>
+</section>
+
+<section class="services">
+    <h2>Our Medical Services</h2>
+
+    <div class="service-container">
+        <div class="service">
+            <h3>General Care</h3>
+            <p>General healthcare consultations.</p>
+        </div>
+
+        <div class="service">
+            <h3>Cardiology</h3>
+            <p>Heart health consultations.</p>
+        </div>
+
+        <div class="service">
+            <h3>Dental Care</h3>
+            <p>Dental health services.</p>
+        </div>
+
+        <div class="service">
+            <h3>Emergency Care</h3>
+            <p>Emergency service information.</p>
+        </div>
+    </div>
+</section>
+
+<section class="appointment">
+    <h2>Request an Appointment</h2>
+
+    <form id="appointmentForm">
+        <label for="service">Select Service</label>
+
+        <select id="service" name="service" required>
+            <option value="">Choose a service</option>
+            <option value="General Care">General Care</option>
+            <option value="Cardiology">Cardiology</option>
+            <option value="Dental Care">Dental Care</option>
+            <option value="Emergency Care">Emergency Care</option>
+        </select>
+
+        <button type="submit">Submit Request</button>
+    </form>
+
+    <p id="result"></p>
+</section>
+
+<footer>
+    <p>Healthcare Connect | DevOps Learning Project</p>
+</footer>
+
+<script>
+document.getElementById("appointmentForm").addEventListener(
+    "submit", async function(event) {
+        event.preventDefault();
+
+        const response = await fetch("/appointment", {
+            method: "POST",
+            body: new FormData(this)
+        });
+
+        const data = await response.json();
+
+        document.getElementById("result").textContent =
+            data.message;
+    }
+);
+</script>
+
+</body>
+</html>
+

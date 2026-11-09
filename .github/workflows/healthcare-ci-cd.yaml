@@ -1,0 +1,143 @@
+
+name: Healthcare CI-CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+
+  test:
+    name: Python Application Testing
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: |
+          pytest -v
+
+
+  build-and-push:
+    name: Build and Push to ECR
+    needs: test
+    runs-on: ubuntu-latest
+
+    outputs:
+      image: ${{ steps.build-image.outputs.image }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push Docker Image
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ github.sha }}
+
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+
+  deploy:
+    name: Deploy to Kubernetes
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Copy Kubernetes manifests to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "k8s/"
+          target: "/home/ubuntu/healthcare-devops"
+
+      - name: Deploy application on EC2
+        uses: appleboy/ssh-action@v1.2.0
+
+        env:
+          IMAGE_URI: ${{ needs.build-and-push.outputs.image }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          ECR_REGISTRY: ${{ needs.build-and-push.outputs.image }}
+          
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: IMAGE_URI,AWS_REGION
+          script: |
+            set -e
+
+            cd /home/ubuntu/healthcare-devops
+
+            echo "Refreshing ECR authentication"
+
+            ECR_REGISTRY=$(echo "$IMAGE_URI" | cut -d/ -f1)
+
+            ECR_PASSWORD=$(aws ecr get-login-password --region "$AWS_REGION")
+
+            kubectl create secret docker-registry ecr-registry \
+              --docker-server="$ECR_REGISTRY" \
+              --docker-username=AWS \
+              --docker-password="$ECR_PASSWORD" \
+              --dry-run=client -o yaml | kubectl apply -f -
+
+            echo "Applying Kubernetes manifests"
+
+            kubectl apply -f k8s/
+
+            echo "Updating deployment image"
+
+            kubectl set image deployment/healthcare-web \
+              healthcare-web="$IMAGE_URI"
+
+            echo "Waiting for deployment"
+
+            kubectl rollout status deployment/healthcare-web \
+              --timeout=180s
+
+            echo "Checking Pods"
+
+            kubectl get pods -o wide
+
+            echo "Deployment completed successfully"
+

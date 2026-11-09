@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: healthcare-web
+  labels:
+    app: healthcare
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: healthcare
+
+  template:
+    metadata:
+      labels:
+        app: healthcare
+
+    spec:
+      imagePullSecrets:
+        - name: ecr-registry
+
+      containers:
+        - name: healthcare-web
+
+          image: 069270876611.dkr.ecr.ca-central-1.amazonaws.com/healthcare-app:v1
+
+          imagePullPolicy: Always
+
+          ports:
+            - containerPort: 5000
+
+          envFrom:
+            - configMapRef:
+                name: healthcare-config
+
+            - secretRef:
+                name: healthcare-secret
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+
+          volumeMounts:
+            - name: healthcare-storage
+              mountPath: /data
+
+      volumes:
+        - name: healthcare-storage
+          persistentVolumeClaim:
+            claimName: healthcare-pvc
